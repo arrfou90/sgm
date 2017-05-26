@@ -81,7 +81,20 @@ GPU Side defines (ASM instructions)
 /*************************************
 DEVICE side basic block primitives
 **************************************/
+ 
+/*
+ASM ins
+ld: laod, return a value
+st: store operation, it does not return a value 
 
+asm(): provide a way to insert arbitrary PTX( parallel thread execution) code into the CUDA program.
+Read more at: http://docs.nvidia.com/cuda/inline-ptx-assembly/index.html#ixzz4iCNzxXa6
+
+f32: float
+.u32: Unsigned integer 32 bits
+addr: address to store with size
+
+*/
 #if FERMI
 	#define LDG(ptr)  (* ptr)
 #else
@@ -149,6 +162,9 @@ __device__ __forceinline__ uint32_t ld_gbl_cs(const __restrict__ uint32_t *addr)
 	return return_value;
 }
 
+// store two floats at a time to an address addr that is 32 bits". %0 is addr, %1 is vlaue.
+// vlaue is the value.
+// addr is the address to store to 
 __device__ __forceinline__ void st_gbl_wt(const __restrict__ uint32_t *addr, const uint32_t value) {
 	asm("st.global.wt.u32 [%0], %1;" :: "l"(addr), "r"(value));
 }
