@@ -82,19 +82,7 @@ GPU Side defines (ASM instructions)
 DEVICE side basic block primitives
 **************************************/
  
-/*
-ASM ins
-ld: laod, return a value
-st: store operation, it does not return a value 
 
-asm(): provide a way to insert arbitrary PTX( parallel thread execution) code into the CUDA program.
-Read more at: http://docs.nvidia.com/cuda/inline-ptx-assembly/index.html#ixzz4iCNzxXa6
-
-f32: float
-.u32: Unsigned integer 32 bits
-addr: address to store with size
-
-*/
 #if FERMI
 	#define LDG(ptr)  (* ptr)
 #else
@@ -149,7 +137,42 @@ __inline__ __device__ int shfl_xor_32(int scalarValue, const int n) {
 		return __shfl_xor(scalarValue, n);
 	#endif
 }
+/*
+//PTX code instructions
 
+ld,st,mov are data movment PTX instrcution, see 8.7.8 http://docs.nvidia.com/pdf/ptx_isa_5.0.pdf
+ld: laod, return a value
+st: store operation, it does not return a value 
+
+asm(): provide a way to insert arbitrary PTX( parallel thread execution) code into the CUDA program.
+Read more at: http://docs.nvidia.com/cuda/inline-ptx-assembly/index.html#ixzz4iCNzxXa6
+
+f32: float
+.u32: Unsigned integer 32 bits
+addr: address to store with size
+
+//Cache Operators for Memory Store Instructions
+
+.wt: Cache write-through (to system memory). The st.wt store write-through operation applied to a global System Memory address
+writes through the L2 cache.
+.cs: Cache streaming, likely to be accessed once. The st.cs store cached-streaming operation allocates cache lines with
+evict-first policy to limit cache pollution by streaming output data.
+
+//che Operators for Memory Load Instructions
+.ca:Cache at all levels, likely to be accessed again.
+The default load instruction cache operation is ld.ca, which allocates cache lines in all
+levels (L1 and L2) with normal eviction policy. Global data is coherent at the L2 level,
+but multiple L1 caches are not coherent for global data. If one thread stores to global memory via one L1 cache,
+and a second thread loads that address via a second L1 cache with ld.ca, the second thread may get stale L1 cache data,
+rather than the data storedby the first thread. The driver must invalidate global L1 cache lines between dependentgrids
+of parallel threads. Stores by the first grid program are then correctly fetched by the second grid program issuing default
+ld.cv loads cached in L1.
+
+Cache streaming, likely to be accessed once.
+The ld.cs load cached streaming operation allocates global lines with evict-first policy
+in L1 and L2 to limit cache pollution by temporary streaming data that may be accessed
+once or twice. When ld.cs is applied to a Local window address, it performs the ld.lu operation.
+*/
 __device__ __forceinline__ uint32_t ld_gbl_ca(const __restrict__ uint32_t *addr) {
 	uint32_t return_value;
 	asm("ld.global.ca.u32 %0, [%1];" : "=r"(return_value) : "l"(addr));
@@ -162,13 +185,13 @@ __device__ __forceinline__ uint32_t ld_gbl_cs(const __restrict__ uint32_t *addr)
 	return return_value;
 }
 
-// store two floats at a time to an address addr that is 32 bits". %0 is addr, %1 is vlaue.
-// vlaue is the value.
-// addr is the address to store to 
+
 __device__ __forceinline__ void st_gbl_wt(const __restrict__ uint32_t *addr, const uint32_t value) {
 	asm("st.global.wt.u32 [%0], %1;" :: "l"(addr), "r"(value));
 }
-
+// store a vlaue u32 at a time to an address addr that is 32 bits with Cache streaming .cs". %0 is addr, %1 is vlaue.
+// vlaue is the value.
+// addr is the address to store to 
 __device__ __forceinline__ void st_gbl_cs(const __restrict__ uint32_t *addr, const uint32_t value) {
 	asm("st.global.cs.u32 [%0], %1;" :: "l"(addr), "r"(value));
 }
